@@ -246,53 +246,29 @@ extension ObjCCompat.Subscription: ObjCCompat_SubscriptionHandling {
     }
 }
 
+extension ObjCCompat.Subscription: SubscriptionHandling {
+    
+    public typealias PFObjectSubclass = PFObject
+    
+    public func didReceive(event: Event<PFObjectSubclass>, forQuery query: PFQuery, inClient client: Client) {
+        self.didRecieveEvent(query, event: ObjCCompat.Event(event: event), client: client)
+    }
+    
+    public func didEncounter(error: ErrorType, forQuery query: PFQuery, inClient client: Client) {
+        self.didRecieveError(query, error: error as NSError, client: client)
+    }
+    
+    public func didSubscribe(toQuery query: PFQuery, inClient client: Client) {
+        self.didSubscribe(query, client: client)
+    }
+    
+    public func didUnsubscribe(fromQuery query: PFQuery, inClient client: Client) {
+        self.didUnsubscribe(query, client: client)
+    }
+}
+
 extension Client {
-    private class HandlerConverter: SubscriptionHandling {
-        typealias PFObjectSubclass = PFObject
-
-        private static var associatedObjectKey: Int = 0
-        private weak var handler: ObjCCompat_SubscriptionHandling?
-
-        init(handler: ObjCCompat_SubscriptionHandling) {
-            self.handler = handler
-
-            objc_setAssociatedObject(handler, &HandlerConverter.associatedObjectKey, self, .OBJC_ASSOCIATION_RETAIN)
-        }
-
-        private func didReceive(event: Event<PFObjectSubclass>, forQuery query: PFQuery, inClient client: Client) {
-            handler?.didRecieveEvent?(query, event: ObjCCompat.Event(event: event), client: client)
-        }
-
-        private func didEncounter(error: ErrorType, forQuery query: PFQuery, inClient client: Client) {
-            handler?.didRecieveError?(query, error: error as NSError, client: client)
-        }
-
-        private func didSubscribe(toQuery query: PFQuery, inClient client: Client) {
-            handler?.didSubscribe?(query, client: client)
-        }
-
-        private func didUnsubscribe(fromQuery query: PFQuery, inClient client: Client) {
-            handler?.didUnsubscribe?(query, client: client)
-        }
-    }
-
-    /**
-     Registers a query for live updates, using a custom subscription handler.
-
-     - parameter query:   The query to register for updates.
-     - parameter handler: A custom subscription handler.
-
-     - returns: The subscription that has just been registered.
-     */
-    @objc(subscribeToQuery:withHandler:)
-    public func _PF_objc_subscribe(
-        query: PFQuery, handler: ObjCCompat_SubscriptionHandling
-        ) -> ObjCCompat_SubscriptionHandling {
-            let swiftHandler = HandlerConverter(handler: handler)
-            subscribe(query, handler: swiftHandler)
-            return handler
-    }
-
+    
     /**
      Registers a query for live updates, using the default subscription handler.
 
@@ -303,7 +279,7 @@ extension Client {
     @objc(subscribeToQuery:)
     public func _PF_objc_subscribe(query: PFQuery) -> ObjCCompat.Subscription {
         let subscription = ObjCCompat.Subscription()
-        _PF_objc_subscribe(query, handler: subscription)
+        subscribe(query, handler: subscription)
         return subscription
     }
 
@@ -316,11 +292,7 @@ extension Client {
     @objc(unsubscribeFromQuery:withHandler:)
     public func _PF_objc_unsubscribe(query: PFQuery, subscriptionHandler: ObjCCompat_SubscriptionHandling) {
         unsubscribe { record in
-            guard let handler = record.subscriptionHandler as? HandlerConverter
-                else {
-                    return false
-            }
-            return record.query == query && handler.handler === subscriptionHandler
+            return record.query == query && record.subscriptionHandler === subscriptionHandler
         }
     }
 }
