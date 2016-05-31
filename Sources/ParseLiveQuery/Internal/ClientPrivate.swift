@@ -19,22 +19,9 @@ private func parseObject<T: PFObject>(objectDictionary: [String:AnyObject]) thro
     guard let objectId = objectDictionary["objectId"] as? String else {
         throw LiveQueryErrors.InvalidJSONError(json: objectDictionary, expectedKey: "objectId")
     }
-
-    let parseObject = T(withoutDataWithClassName: parseClassName, objectId: objectId)
-
-    // Map of strings to closures to determine if the key is valid. Allows for more advanced checking of
-    // classnames and such.
-    let invalidKeys: [String:Void->Bool] = [
-        "objectId": { true },
-        "parseClassName": { true },
-        "sessionToken": { parseClassName == "_User" }
-    ]
-
-    objectDictionary.filter { key, _ in
-        return !(invalidKeys[key].map { $0() } ?? false)
-    }.forEach { key, value in
-        parseObject[key] = value
-    }
+    
+    let parseObject = T(fromDictionary: objectDictionary, defaultClassName: parseClassName, completeData:true)
+    
     return parseObject
 }
 
